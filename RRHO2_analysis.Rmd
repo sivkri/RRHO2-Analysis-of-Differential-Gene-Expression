@@ -1,0 +1,219 @@
+---
+title: "RRHO2 Analysis of WT and HuR"
+author: "Sivakumar"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This document performs an analysis using **RRHO2** to compare gene expression in WT and HuR datasets.
+
+## Setup Environment
+
+```{r load-libraries}
+library(readxl)
+library(dplyr)
+library(devtools)
+library(RRHO2)
+library(ggplot2)
+library(grid)
+```
+
+## Load Data
+
+```{r load-data}
+wt_file <- "WT_E20_vs_WT_DMSO_deseq2.xls"
+HuR_file <- "HuRKO_E20_vs_HuRKO_DMSO_deseq2.xls"
+
+wt_data <- read.delim(wt_file, header = TRUE)
+HuR_data <- read.delim(HuR_file, header = TRUE)
+```
+
+## Data Filtering
+
+```{r filter-data}
+wt_data_filtered <- wt_data %>%
+  filter(!is.na(pvalue) & pvalue > 0, abs(log2FoldChange) > 1) %>%
+  mutate(rank_metric = -log10(pvalue) * sign(log2FoldChange)) %>%
+  arrange(desc(rank_metric))
+
+HuR_data_filtered <- HuR_data %>%
+  filter(!is.na(pvalue) & pvalue > 0, abs(log2FoldChange) > 1) %>%
+  mutate(rank_metric = -log10(pvalue) * sign(log2FoldChange)) %>%
+  arrange(desc(rank_metric))
+```
+
+## Find Common Genes
+
+```{r find-common-genes}
+common_genes <- intersect(wt_data_filtered$GeneID, HuR_data_filtered$GeneID)
+wt_common <- wt_data_filtered %>% filter(GeneID %in% common_genes)
+HuR_common <- HuR_data_filtered %>% filter(GeneID %in% common_genes)
+
+nrow(wt_common)  # Total genes in WT dataset
+nrow(HuR_common)  # Total genes in HuR dataset
+length(common_genes)  # Number of common genes
+
+wt_rank <- setNames(wt_common$rank_metric, wt_common$GeneID)
+HuR_rank <- setNames(HuR_common$rank_metric, HuR_common$GeneID)
+
+wt_rank <- wt_rank[common_genes]
+HuR_rank <- HuR_rank[common_genes]
+
+length(wt_rank)  # Should be 701
+length(HuR_rank)  # Should be 701
+```
+
+## Rank Genes and Run RRHO2
+
+```{r rrho2-analysis}
+wt_rank_df <- data.frame(GeneID = names(wt_rank), rank_metric = wt_rank)
+HuR_rank_df <- data.frame(GeneID = names(HuR_rank), rank_metric = HuR_rank)
+
+RRHO_obj <- RRHO2_initialize(
+  wt_rank_df, HuR_rank_df,
+  labels = NULL,
+  log10.ind = TRUE,
+  multipleTesting = "none",
+  boundary = 0.1,
+  method = "hyper"
+)
+```
+
+## Results Visualization
+
+```{r rrho2-plots}
+RRHO2_vennDiagram(RRHO_obj, type="uu")
+RRHO2_heatmap(RRHO_obj)
+```
+
+## Summary Statistics
+
+```{r summary-stats}
+summary(RRHO_obj)
+```
+
+## Save Heatmap
+
+```{r save-plot}
+tiff("RRHO2_wt_HuR_1.png", width = 8, height = 6, units = "in", res = 100)
+RRHO2_heatmap(RRHO_obj, labels = c("WT", "HuRKO"))
+dev.off()
+```
+
+## Save Enhanced Heatmap
+
+```{r save-plot2}
+tiff("RRHO2_wt_HuR-1.png", width = 8, height = 6, units = "in", res = 100)
+
+RRHO2_heatmap <- function(RRHO_obj, maximum=NULL, minimum=NULL, 
+                          colorGradient=NULL, labels=NULL, 
+                          tickLabelSize=2,   # increase tick font size
+                          titleSize=2,         # increase title font size
+                          titleMargin=0.1,       # increase margin for title
+                          cbWidth = 4, 
+                          ...) {
+  
+  hypermat <- RRHO_obj$hypermat
+  method <- RRHO_obj$method
+  
+  if(is.null(labels)){
+    labels <- RRHO_obj$labels	
+  }
+  
+  if(!is.null(maximum)){
+    hypermat[hypermat > maximum] <- maximum
+  } else {
+    maximum <- max(hypermat, na.rm=TRUE)
+  }
+  
+  if(!is.null(minimum)){
+    hypermat[hypermat < minimum] <- minimum
+  } else {
+    minimum <- min(hypermat, na.rm=TRUE)
+  }
+  
+  if(minimum > maximum){
+    stop("minimum > maximum, please check these function arguments!")
+  }
+  
+  # Internal function to draw a colorbar
+  color.bar <- function(lut, min, max=-min, 
+                        nticks=11, 
+                        ticks=seq(min, max, len=nticks), 
+                        title='') {
+    scale  <- (length(lut)-1)/(max-min)
+    plot(c(0,10), c(min,max), type='n', bty='n', 
+         xaxt='n', xlab='', yaxt='n', ylab='')
+    mtext(title, side=4, line=titleMargin, cex=titleSize)
+    axis(2, at=ticks, labels=round(ticks,0), las=1, cex.axis=tickLabelSize)
+    for (i in 1:(length(lut)-1)) {
+      y  <- (i-1)/scale + min
+      rect(0, y, cbWidth, y+1/scale, col=lut[i], border=NA)
+    }
+  }
+  
+  if(is.null(colorGradient)){
+    jet.colors  <- colorRampPalette(
+      c("#00007F", "blue", "#007FFF", "cyan", 
+        "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
+    colorGradient <- jet.colors(101)
+  }
+  
+  layout(matrix(c(rep(1, 6), 2), 1, 7, byrow = TRUE))
+  
+  breaks <- seq(minimum, maximum, length.out = length(colorGradient) + 1)
+  
+  # Plot the heatmap (without default axis labels)
+  image(x = 1:ncol(hypermat), y = 1:nrow(hypermat), z = t(hypermat),
+        col = colorGradient, breaks = breaks, axes = FALSE,
+        xlab = "", ylab = "", ...)
+  
+  # Suppress default mtext labels by passing empty labels
+  if(!is.null(labels) && any(labels != "")){
+    mtext(labels[2], side=2, line=0.5)
+    mtext(labels[1], side=1, line=0.5)
+  }
+  
+  if(method == "hyper"){
+    atitle <- ifelse(RRHO_obj$log10.ind, "-log10(P-value)", "-log(P-value)")
+    color.bar(colorGradient, min = minimum, max = maximum, nticks = 6, title = atitle)
+  } else if (method == "fisher"){
+    atitle <- "log Odds"
+    color.bar(colorGradient, min = minimum, max = maximum, nticks = 6, title = atitle)
+  } else {
+    stop("internal error (1), please report this error to https://github.com/RRHO2/RRHO2/issues")
+  }
+  invisible(hypermat)
+}
+
+# Create the heatmap without default axis labels
+RRHO2_heatmap(RRHO_obj, labels = c("", ""))
+
+grid.text("WT", x = unit(0.45, "npc"), y = unit(0.03, "npc"),
+          gp = gpar(fontsize = 24))
+
+grid.text("HuRKO", x = unit(0.02, "npc"), y = unit(0.55, "npc"), rot = 90,
+          gp = gpar(fontsize = 24, fontface = "italic"))
+
+grid.text("Up", x = unit(0.04, "npc"), y = unit(0.75, "npc"),
+          rot = 90, gp = gpar(fontsize = 24))
+grid.text("Down", x = unit(0.04, "npc"), y = unit(0.3, "npc"),
+          rot = 90, gp = gpar(fontsize = 24))
+grid.text("Down", x = unit(0.25, "npc"), y = unit(0.08, "npc"),
+          gp = gpar(fontsize = 24))
+grid.text("Up", x = unit(0.65, "npc"), y = unit(0.08, "npc"),
+          gp = gpar(fontsize = 24))
+
+# Close graphics device
+dev.off()
+```
+
+## Conclusion
+
+This analysis provides insights into gene expression similarities and differences between WT and HuR using RRHO2.
