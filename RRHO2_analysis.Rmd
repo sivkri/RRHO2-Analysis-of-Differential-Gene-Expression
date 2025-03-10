@@ -30,8 +30,8 @@ library(grid)
 wt_file <- "WT_E20_vs_WT_DMSO_deseq2.xls"
 HuR_file <- "HuRKO_E20_vs_HuRKO_DMSO_deseq2.xls"
 
-wt_data <- read.delim(wt_file, header = TRUE)
-HuR_data <- read.delim(HuR_file, header = TRUE)
+wt_data <- read_excel(wt_file, header = TRUE)
+HuR_data <- read_excel(HuR_file, header = TRUE)
 ```
 
 ## Data Filtering
@@ -65,8 +65,8 @@ HuR_rank <- setNames(HuR_common$rank_metric, HuR_common$GeneID)
 wt_rank <- wt_rank[common_genes]
 HuR_rank <- HuR_rank[common_genes]
 
-length(wt_rank)  # Should be 701
-length(HuR_rank)  # Should be 701
+length(wt_rank)  
+length(HuR_rank)  
 ```
 
 ## Rank Genes and Run RRHO2
