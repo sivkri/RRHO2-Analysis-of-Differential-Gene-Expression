@@ -42,7 +42,7 @@ rmarkdown::render("analysis.Rmd")
 ## Expected Output
 - **Venn Diagram & Heatmap:** Visualizing overlap between WT and ABI1.
 - **Summary Statistics:** Gene overlap and correlation analysis.
-- **TIFF Image:** `RRHO2_wt_abi1.tiff` (for publication-ready visuals).
+- **TIFF Image:** `RRHO2_WT_vs_HuR.tiff` (for publication-ready visuals).
 
 
 ## Contact
