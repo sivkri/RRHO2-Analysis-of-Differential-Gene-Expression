@@ -7,8 +7,8 @@ This project performs **Rank-Rank Hypergeometric Overlap (RRHO2)** analysis on g
 ```
 RRHO2_analysis/
 │-- WT_E20_vs_WT_DMSO_deseq2.xls            # Wild-type gene expression ranking
-│-- HuRKO_E20_vs_HuRKO_DMSO_deseq2.xls  # HuR knockout gene expression ranking
-│-- RRHO2_wt_HuR.tiff                    # Output heatmap image
+│-- HuRKO_E20_vs_HuRKO_DMSO_deseq2.xls      # HuR knockout gene expression ranking
+│-- RRHO2_wt_HuR.tiff                       # Output heatmap image
 │-- RRHO2_analysis.Rmd                      # RMarkdown script for analysis
 ```
 
